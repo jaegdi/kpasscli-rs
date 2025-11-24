@@ -1,0 +1,3 @@
+database_path: ../testpass.kdbx
+default_output: clipboard
+clipboard_timeout: 5

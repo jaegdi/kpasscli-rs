@@ -1,0 +1,4 @@
+database_path: /projekte/Security/KeePass/Database_ansible_pkp-deployer_vault.kdbx
+default_output: stdout
+password_file:
+password_executable: get-keepass-central-db-master-password.sh

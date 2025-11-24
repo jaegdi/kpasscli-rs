@@ -1,0 +1,13 @@
+/.github
+/.git
+/.vscode
+/archive
+/old-version
+/dist
+go.mod
+go.sum
+go --- IGNORE ---
+/build*
+/coverage*
+*test.go
+nohup.out

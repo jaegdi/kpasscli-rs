@@ -1,0 +1,12 @@
+# the path and file name of the keepass database
+# C:\Users\dirkj\devel\go\kpasscli\
+database_path: testpass.kdbx
+
+# the default output for the password, can be 'stdout' or 'clipboard'
+default_output: stdout
+
+# file which contains the password to open the keepass db
+password_file: testpasswd
+# or
+# the path to the executable, that returns the password to open the keepass database
+password_executable:
