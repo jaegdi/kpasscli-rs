@@ -62,4 +62,12 @@ pub struct Args {
     /// Hidden argument for background clipboard clearing (internal use only)
     #[arg(long, hide = true)]
     pub clear_clipboard_after: Option<u64>,
+
+    /// Get TOTP token
+    #[arg(short = 't', long = "totp")]
+    pub totp: bool,
+
+    /// Get password and TOTP token
+    #[arg(short = 'T', long = "password-totp", alias = "pt")]
+    pub password_totp: bool,
 }

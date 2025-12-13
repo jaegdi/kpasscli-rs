@@ -5,7 +5,7 @@
 
 set -e
 
-cd kpasscli-rs
+# cd kpasscli-rs
 
 echo
 echo "Build linux x86_64 binary of kpasscli"

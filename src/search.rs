@@ -1,6 +1,6 @@
-use anyhow::{Result, anyhow};
-use keepass_ng::db::{Database, Group, NodePtr, Node, with_node};
-
+use anyhow::{anyhow, Result};
+use keepass::db::{Entry, Group, Node};
+use keepass::Database;
 
 #[derive(Debug, Clone)]
 pub struct SearchOptions {
@@ -16,7 +16,7 @@ pub struct Finder<'a> {
 #[derive(Debug)]
 pub struct SearchResult {
     pub path: String,
-    pub node: NodePtr,
+    pub entry: Entry, // Return cloned Entry
 }
 
 impl<'a> Finder<'a> {
@@ -26,12 +26,9 @@ impl<'a> Finder<'a> {
 
     pub fn find(&self, query: &str) -> Result<Vec<SearchResult>> {
         if query.starts_with('/') {
-            self.find_by_absolute_path(query)
-        } else if query.contains('/') {
-            self.find_by_subpath(query)
-        } else {
-            self.find_by_name(query)
+            return self.find_by_absolute_path(query);
         }
+        self.find_by_search(query)
     }
 
     fn find_by_absolute_path(&self, path: &str) -> Result<Vec<SearchResult>> {
@@ -40,201 +37,112 @@ impl<'a> Finder<'a> {
             return Err(anyhow!("Empty path"));
         }
 
-        // db.root is SerializableNodePtr which derefs to NodePtr
-        // We need to treat it as a Group to get its name and children
-        
-        let root_ptr = &self.db.root;
-        
-        let root_name = with_node::<Group, _, _>(root_ptr, |g| g.get_title().unwrap_or("").to_string())
-            .ok_or_else(|| anyhow!("Root is not a group"))?;
-            
-        // Check if path starts with root name
-        // ... (logic remains similar but we need to work with NodePtr/Group)
-        
-        // Let's just start search from root.
-        
-        let start_index = if parts[0] == root_name { 1 } else { 0 };
-        
+        let root = &self.db.root;
+
+        // If path starts with root name, skip it
+        let start_index = if parts[0] == root.name { 1 } else { 0 };
+
         if start_index >= parts.len() {
-             return Err(anyhow!("Cannot return root group as result"));
+            return Err(anyhow!("Cannot return root group as result"));
         }
-        
-        let mut current_node_ptr: NodePtr = (**root_ptr).clone(); 
+
+        let mut current_group = root;
 
         for i in start_index..parts.len() {
             let part = parts[i];
             let is_last_part = i == parts.len() - 1;
-            
-            // Access current group
-            let (children, entries) = with_node::<Group, _, _>(&current_node_ptr, |g| {
-                (g.groups(), g.entries())
-            }).ok_or_else(|| anyhow!("Current node is not a group"))?;
-            
-            let mut found = false;
-            
-            if is_last_part {
-                // Check entries first
-                for entry in entries {
-                    let title = entry.borrow().get_title().map(|s| s.to_string()).unwrap_or_default();
-                    if title == part {
-                        return Ok(vec![SearchResult {
-                            path: path.to_string(),
-                            node: entry,
-                        }]);
+
+            let mut found_group = None;
+
+            // Check subgroups
+            for child in &current_group.children {
+                if let Node::Group(g) = child {
+                    if g.name == part {
+                        found_group = Some(g);
+                        break;
                     }
                 }
             }
-            
-            // Check subgroups
-            for child in children {
-                let title = child.borrow().get_title().map(|s| s.to_string()).unwrap_or_default();
-                if title == part {
-                    current_node_ptr = child;
-                    found = true;
-                    break;
+
+            if let Some(g) = found_group {
+                if is_last_part {
+                    // Path points to a group. We usually want entries.
+                    // But maybe we should return all entries in this group?
+                    // Or maybe the user meant an entry with this name?
+                    // Let's check if there is an entry with this name in current_group first.
                 }
-            }
-            
-            if !found && !is_last_part {
+                current_group = g;
+            } else if is_last_part {
+                // Check entries in current_group
+                for entry in current_group.entries() {
+                    let title = entry.get_title().unwrap_or("");
+                    if title == part {
+                        return Ok(vec![SearchResult {
+                            path: path.to_string(),
+                            entry: entry.clone(),
+                        }]);
+                    }
+                }
+                return Err(anyhow!("Entry not found: {}", part));
+            } else {
                 return Err(anyhow!("Group not found: {}", part));
             }
-            if !found && is_last_part {
-                 // If we found a group (assigned to current_node_ptr), return it
-                 return Ok(vec![SearchResult {
-                     path: path.to_string(),
-                     node: current_node_ptr,
-                 }]);
-            }
-        }
-        
-        Err(anyhow!("Entry not found"))
-    }
-
-    fn find_by_subpath(&self, query: &str) -> Result<Vec<SearchResult>> {
-        let parts: Vec<&str> = query.split('/').collect();
-        if parts.len() < 2 {
-            return Err(anyhow!("Invalid subpath query"));
         }
 
-        let target_name = parts.last().unwrap();
-        let sub_path = &parts[..parts.len() - 1];
-        
-        let mut results = Vec::new();
-        // Start from root
-        let root_ptr = &self.db.root;
-        with_node::<Group, _, _>(root_ptr, |g| {
-            self.search_group_recursive(g, "/", sub_path, target_name, &mut results)
-        }).ok_or_else(|| anyhow!("Root is not a group"))??;
-        
-        // Filter results
-        let filtered: Vec<SearchResult> = results.into_iter()
-            .filter(|r| r.path.contains(query))
-            .collect();
-
-        Ok(filtered)
+        // If we ended up at a group, maybe return all entries?
+        // For now, let's say we only support finding specific entries.
+        Err(anyhow!("Path points to a group, not an entry"))
     }
 
-    fn find_by_name(&self, query: &str) -> Result<Vec<SearchResult>> {
+    fn find_by_search(&self, query: &str) -> Result<Vec<SearchResult>> {
         let mut results = Vec::new();
-        let root_ptr = &self.db.root;
-        with_node::<Group, _, _>(root_ptr, |g| {
-            self.search_group_recursive_name(g, "", query, &mut results)
-        }).ok_or_else(|| anyhow!("Root is not a group"))??;
+        let root = &self.db.root;
+        // Start recursion. Root name is usually not part of the path in results if we want /Group/Entry
+        // But if root has a name, it might be.
+        // Let's assume root name is not part of the path for now, or handle it inside.
+        // If we pass empty string as current_path, the logic inside handles it.
+        self.search_recursive(root, "", query, &mut results);
         Ok(results)
     }
 
-    fn search_group_recursive(
+    fn search_recursive(
         &self,
         group: &Group,
         current_path: &str,
-        search_path: &[&str],
-        target_name: &str,
+        query: &str,
         results: &mut Vec<SearchResult>,
-    ) -> Result<()> {
-        let group_name = group.get_title().unwrap_or("");
-        let group_path = if group_name.is_empty() {
-            current_path.to_string()
-        } else {
-             if current_path == "/" {
-                format!("/{}", group_name)
+    ) {
+        let group_name = &group.name;
+
+        let group_path = if current_path.is_empty() {
+            if group_name == "Root" || group_name.is_empty() {
+                String::new()
             } else {
-                format!("{}/{}", current_path, group_name)
-            }
-        };
-
-        // Check if we are at the target depth
-        if search_path.len() == 1 {
-             for entry in group.entries() {
-                let title = entry.borrow().get_title().map(|s| s.to_string()).unwrap_or_default();
-                if self.matches(&title, target_name) {
-                     let full_path = format!("{}/{}", group_path, title);
-                     results.push(SearchResult {
-                        path: full_path,
-                        node: entry,
-                    });
-                }
-            }
-        }
-
-        if !search_path.is_empty() {
-             if self.matches(group_name, search_path[0]) {
-                 for child_ptr in group.groups() {
-                     // We need to recursively call. But child_ptr is NodePtr.
-                     // We need to borrow it as Group.
-                     with_node::<Group, _, _>(&child_ptr, |child_group| {
-                         let _ = self.search_group_recursive(child_group, &group_path, &search_path[1..], target_name, results);
-                     });
-                 }
-             }
-        }
-
-        // Always search subgroups
-        for child_ptr in group.groups() {
-            with_node::<Group, _, _>(&child_ptr, |child_group| {
-                 let _ = self.search_group_recursive(child_group, &group_path, search_path, target_name, results);
-            });
-        }
-
-        Ok(())
-    }
-
-    fn search_group_recursive_name(
-        &self,
-        group: &Group,
-        current_path: &str,
-        target_name: &str,
-        results: &mut Vec<SearchResult>,
-    ) -> Result<()> {
-         let group_name = group.get_title().unwrap_or("");
-         
-         let group_path = if group_name.is_empty() {
-            current_path.to_string()
-        } else {
-            if current_path.is_empty() {
                 group_name.to_string()
-            } else {
-                format!("{}/{}", current_path, group_name)
             }
+        } else {
+            format!("{}/{}", current_path, group_name)
         };
 
         for entry in group.entries() {
-            let title = entry.borrow().get_title().map(|s| s.to_string()).unwrap_or_default();
-            if self.matches(&title, target_name) {
-                let full_path = format!("{}/{}", group_path, title);
+            let title = entry.get_title().unwrap_or("");
+            if self.matches(title, query) {
+                let full_path = if group_path.is_empty() {
+                    title.to_string()
+                } else {
+                    format!("{}/{}", group_path, title)
+                };
+
                 results.push(SearchResult {
                     path: format!("/{}", full_path),
-                    node: entry,
+                    entry: entry.clone(),
                 });
             }
         }
 
-        for child_ptr in group.groups() {
-            with_node::<Group, _, _>(&child_ptr, |child_group| {
-                let _ = self.search_group_recursive_name(child_group, &group_path, target_name, results);
-            });
+        for child_group in group.groups() {
+            self.search_recursive(child_group, &group_path, query, results);
         }
-
-        Ok(())
     }
 
     fn matches(&self, value: &str, pattern: &str) -> bool {

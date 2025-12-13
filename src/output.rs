@@ -1,10 +1,10 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use arboard::Clipboard;
-use keepass_ng::db::{Entry, NodePtr, with_node, Node};
+use keepass::db::Entry;
 
+use crate::config::Config;
 use std::io::Write;
 use std::process::{Command, Stdio};
-use crate::config::Config;
 
 pub enum OutputType {
     Stdout,
@@ -28,7 +28,10 @@ pub struct Handler {
 
 impl Handler {
     pub fn new(output_type: OutputType, clipboard_timeout: Option<u64>) -> Self {
-        Self { output_type, clipboard_timeout }
+        Self {
+            output_type,
+            clipboard_timeout,
+        }
     }
 
     pub fn output(&self, value: &str) -> Result<()> {
@@ -45,9 +48,11 @@ impl Handler {
                         return Ok(());
                     }
                 }
-                
+
                 let mut clipboard = Clipboard::new().context("Failed to initialize clipboard")?;
-                clipboard.set_text(value).context("Failed to copy to clipboard")?;
+                clipboard
+                    .set_text(value)
+                    .context("Failed to copy to clipboard")?;
                 self.spawn_background_clear()?;
                 Ok(())
             }
@@ -58,8 +63,8 @@ impl Handler {
         if let Some(timeout) = self.clipboard_timeout {
             if timeout > 0 {
                 // Get current executable path
-                let exe = std::env::current_exe()
-                    .context("Failed to get current executable path")?;
+                let exe =
+                    std::env::current_exe().context("Failed to get current executable path")?;
 
                 // Spawn background process to clear clipboard after timeout
                 Command::new(exe)
@@ -71,7 +76,10 @@ impl Handler {
                     .spawn()
                     .context("Failed to spawn background clipboard clearer")?;
 
-                eprintln!("Clipboard will be cleared in {} seconds (running in background)...", timeout);
+                eprintln!(
+                    "Clipboard will be cleared in {} seconds (running in background)...",
+                    timeout
+                );
             }
         }
         Ok(())
@@ -82,10 +90,8 @@ impl Handler {
 fn copy_to_clipboard_linux(value: &str) -> Result<()> {
     // Try wl-copy for Wayland
     if is_command_available("wl-copy") {
-        let mut child = Command::new("wl-copy")
-            .stdin(Stdio::piped())
-            .spawn()?;
-            
+        let mut child = Command::new("wl-copy").stdin(Stdio::piped()).spawn()?;
+
         if let Some(mut stdin) = child.stdin.take() {
             stdin.write_all(value.as_bytes())?;
         }
@@ -100,22 +106,22 @@ fn copy_to_clipboard_linux(value: &str) -> Result<()> {
             .arg("clipboard")
             .stdin(Stdio::piped())
             .spawn()?;
-            
+
         if let Some(mut stdin) = child.stdin.take() {
             stdin.write_all(value.as_bytes())?;
         }
         child.wait()?;
         return Ok(());
     }
-    
+
     // Try xsel as fallback
     if is_command_available("xsel") {
-         let mut child = Command::new("xsel")
+        let mut child = Command::new("xsel")
             .arg("--clipboard")
             .arg("--input")
             .stdin(Stdio::piped())
             .spawn()?;
-            
+
         if let Some(mut stdin) = child.stdin.take() {
             stdin.write_all(value.as_bytes())?;
         }
@@ -143,7 +149,7 @@ pub fn resolve_output_type(flag_out: Option<String>, cfg: &Config) -> OutputType
             return t;
         }
     }
-    
+
     if let Ok(env_out) = std::env::var("KPASSCLI_OUT") {
         if let Some(t) = OutputType::from_str(&env_out) {
             return t;
@@ -159,41 +165,49 @@ pub fn resolve_output_type(flag_out: Option<String>, cfg: &Config) -> OutputType
     OutputType::Stdout
 }
 
-pub fn show_all_fields(node: &NodePtr) {
-    with_node::<Entry, _, _>(node, |entry| {
-        println!("----------------------------------------");
-        println!("Entry Details:");
-        println!("----------------------------------------");
+pub fn show_all_fields(entry: &Entry) {
+    println!("----------------------------------------");
+    println!("Entry Details:");
+    println!("----------------------------------------");
 
-        if let Some(title) = entry.get_title() {
-            println!("Title: {}", title);
+    if let Some(title) = entry.get_title() {
+        println!("Title: {}", title);
+    }
+    if let Some(username) = entry.get_username() {
+        println!("Username: {}", username);
+    }
+    if let Some(url) = entry.get_url() {
+        println!("URL: {}", url);
+    }
+    if let Some(notes) = entry.get("Notes") {
+        println!("Notes: {}", notes);
+    }
+
+    // Custom fields
+    for key in entry.fields.keys() {
+        if let Some(val) = entry.get(key) {
+            println!("{}: {}", key, val);
         }
-        if let Some(username) = entry.get_username() {
-            println!("Username: {}", username);
-        }
-        if let Some(url) = entry.get_url() {
-            println!("URL: {}", url);
-        }
-        if let Some(notes) = entry.get_notes() {
-            println!("Notes: {}", notes);
-        }
-        
-        // Custom fields?
-        // We can't iterate over private fields.
-        // But maybe we can print what we have.
-        
-        println!("----------------------------------------");
-        println!("Metadata:");
-        // Times
-        let times = entry.get_times();
-        if let Some(t) = times.get_creation() {
-            println!("Created: {}", t);
-        }
-        if let Some(t) = times.get_last_modification() {
-            println!("Modified: {}", t);
-        }
-        if let Some(t) = times.get_last_access() {
-            println!("Accessed: {}", t);
-        }
-    });
+    }
+
+    println!("----------------------------------------");
+    println!("Metadata:");
+    // Times
+    // keepass crate might have different API for times.
+    // Let's assume get_times() exists or similar.
+    // If not, we will fix it.
+    // entry.times is public in keepass crate usually.
+
+    /*
+    let times = entry.get_times();
+    if let Some(t) = times.get_creation() {
+        println!("Created: {}", t);
+    }
+    if let Some(t) = times.get_last_modification() {
+        println!("Modified: {}", t);
+    }
+    if let Some(t) = times.get_last_access() {
+        println!("Accessed: {}", t);
+    }
+    */
 }

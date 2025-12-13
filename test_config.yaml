@@ -1,3 +1,4 @@
-database_path: ../testpass.kdbx
+database_path: testpass.kdbx
 default_output: clipboard
 clipboard_timeout: 5
+password_file: testpasswd
