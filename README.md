@@ -67,7 +67,7 @@ The CLI flags below reflect the current implementation in `src/args.rs`.
 | `-w, --kdbpassword <PATH>` | `KPASSCLI_kdbpassword` | `password_file` or `password_executable` | Password source: file path or executable |
 | `-i, --item <NAME>` | — | — | Entry to search for (required) |
 | `-f, --fieldname <FIELD>` | — | — | Field to retrieve (default: `Password`) |
-| `-o, --out <stdout|clipboard>` | `KPASSCLI_OUT` | `default_output` | Output destination |
+| `-o, --out <stdout\|clipboard>` | `KPASSCLI_OUT` | `default_output` | Output destination |
 | `-C, --Clip` | — | — | Shortcut: force clipboard output (overrides env/config) |
 | `-c, --case-sensitive` | — | — | Enable case‑sensitive search |
 | `-e, --exact-match` | — | — | Enable exact match search |
