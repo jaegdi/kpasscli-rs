@@ -78,6 +78,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout code
@@ -88,21 +90,71 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create release archives
+      - name: Prepare release assets
         run: |
+          mkdir -p release-assets
           cd artifacts
+          
+          # Copy and rename binaries for direct download
           for dir in */; do
+            asset_name="${dir%/}"
             cd "$dir"
-            tar -czf "../${dir%/}.tar.gz" *
+            
+            # Find the binary file (could be kpasscli or kpasscli.exe)
+            binary_file=$(ls)
+            
+            # Copy with the asset name
+            cp "$binary_file" "../../release-assets/$asset_name"
+            
+            # Also create a compressed archive
+            if [[ "$asset_name" == *"windows"* ]]; then
+              zip "../../release-assets/${asset_name}.zip" "$binary_file"
+            else
+              tar -czf "../../release-assets/${asset_name}.tar.gz" "$binary_file"
+            fi
+            
             cd ..
           done
+          
+          cd ../release-assets
+          
+          # Generate checksums
+          sha256sum * > SHA256SUMS.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/*.tar.gz
+          files: release-assets/*
           draft: false
           prerelease: false
           generate_release_notes: true
+          body: |
+            ## Downloads
+            
+            Download the binary for your platform:
+            
+            - **Linux (x86_64)**: `kpasscli-linux-amd64` or `kpasscli-linux-amd64.tar.gz`
+            - **Windows (x86_64)**: `kpasscli-windows-amd64.exe` or `kpasscli-windows-amd64.exe.zip`
+            - **macOS Intel (x86_64)**: `kpasscli-darwin-amd64` or `kpasscli-darwin-amd64.tar.gz`
+            - **macOS Apple Silicon (ARM64)**: `kpasscli-darwin-arm64` or `kpasscli-darwin-arm64.tar.gz`
+            
+            Verify downloads using `SHA256SUMS.txt`.
+            
+            ## Installation
+            
+            ### Linux/macOS
+            ```bash
+            # Download the binary
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/kpasscli-linux-amd64
+            
+            # Make it executable
+            chmod +x kpasscli-linux-amd64
+            
+            # Move to PATH (optional)
+            sudo mv kpasscli-linux-amd64 /usr/local/bin/kpasscli
+            ```
+            
+            ### Windows
+            Download `kpasscli-windows-amd64.exe` and add it to your PATH.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
