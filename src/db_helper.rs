@@ -88,11 +88,22 @@ fn resolve_password_from_source(source: &str) -> Result<String> {
 }
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 
+#[cfg(unix)]
 fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
     if let Ok(metadata) = fs::metadata(path) {
         return metadata.permissions().mode() & 0o111 != 0;
+    }
+    false
+}
+
+#[cfg(windows)]
+fn is_executable(path: &Path) -> bool {
+    // On Windows, check if the file has an executable extension
+    if let Some(ext) = path.extension() {
+        let ext = ext.to_string_lossy().to_lowercase();
+        return ext == "exe" || ext == "bat" || ext == "cmd" || ext == "ps1";
     }
     false
 }

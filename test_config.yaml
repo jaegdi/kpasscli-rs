@@ -1,4 +1,4 @@
 database_path: testpass.kdbx
-default_output: clipboard
+default_output: stdout
 clipboard_timeout: 5
 password_file: testpasswd

@@ -143,9 +143,14 @@ fn is_command_available(program: &str) -> bool {
         .unwrap_or(false)
 }
 
-pub fn resolve_output_type(flag_out: Option<String>, cfg: &Config) -> OutputType {
+pub fn resolve_output_type(flag_out: Option<String>, clipboard: bool, cfg: &Config) -> OutputType {
     if let Some(out) = flag_out {
         if let Some(t) = OutputType::from_str(&out) {
+            return t;
+        }
+    }
+    if clipboard {
+        if let Some(t) = OutputType::from_str("clipboard") {
             return t;
         }
     }

@@ -59,21 +59,27 @@ kpasscli [OPTIONS]
 
 ### Options
 
-| Option | Environment Variable | Config File | Description |
-|--------|---------------------|-------------|-------------|
-| `-p, --kdb-path <PATH>` | `KPASSCLI_KDBPATH` | `database_path` | Path to KeePass database file |
-| `-w, --kdb-password <PATH>` | `KPASSCLI_kdbpassword` | `password_file` or `password_executable` | Path to password file or executable |
-| `-i, --item <NAME>` | - | - | Entry to search for (required) |
-| `-f, --field-name <FIELD>` | - | - | Field to retrieve (default: Password) |
-| `-o, --out <TYPE>` | `KPASSCLI_OUT` | `default_output` | Output type: stdout or clipboard |
-| `-c, --config <PATH>` | - | - | Path to config file (default: `~/.config/kpasscli/config.yaml`) |
-| `--case-sensitive` | - | - | Enable case-sensitive search |
-| `--exact-match` | - | - | Enable exact match search |
-| `--show-all` | - | - | Show all fields of an entry |
-| `--create-config` | - | - | Create example config file |
-| `--print-config` | - | - | Print current configuration |
-| `--verify` | - | - | Verify database can be opened |
-| `-h, --help` | - | - | Print help |
+The CLI flags below reflect the current implementation in `src/args.rs`.
+
+| Option | Env Var | Config Key | Description |
+|--------|---------|------------|-------------|
+| `-p, --kdbpath <PATH>` | `KPASSCLI_KDBPATH` | `database_path` | Path to KeePass database file |
+| `-w, --kdbpassword <PATH>` | `KPASSCLI_kdbpassword` | `password_file` or `password_executable` | Password source: file path or executable |
+| `-i, --item <NAME>` | — | — | Entry to search for (required) |
+| `-f, --fieldname <FIELD>` | — | — | Field to retrieve (default: `Password`) |
+| `-o, --out <stdout|clipboard>` | `KPASSCLI_OUT` | `default_output` | Output destination |
+| `-C, --Clip` | — | — | Shortcut: force clipboard output (overrides env/config) |
+| `-c, --case-sensitive` | — | — | Enable case‑sensitive search |
+| `-e, --exact-match` | — | — | Enable exact match search |
+| `--show-all` | — | — | Print all common and custom fields for the entry |
+| `-t, --totp` | — | — | Output TOTP token generated from the entry’s `otp` field |
+| `-T, --password-totp` (alias `--pt`) | — | — | Output `<password> <totp>` on one line |
+| `--create-config` (alias `--cc`) | — | — | Create example config file in current directory |
+| `--print-config` (alias `--pc`) | — | — | Print the effective configuration and file path |
+| `--config <PATH>` | — | — | Path to config file (default: `~/.config/kpasscli/config.yaml`) |
+| `-d, --debug` | — | — | Print timing/debug info to stderr |
+| `-v, --verify` | — | — | Enable verify messages (informational) |
+| `-h, --help` | — | — | Print help |
 
 ## Search Behavior
 
@@ -105,10 +111,17 @@ kpasscli uses a layered configuration approach:
 ### Configuration File Format
 
 ```yaml
-database_path: /path/to/database.kdbx
-default_output: clipboard
-password_file: /path/to/password.txt
-clipboard_timeout: 15  # seconds, 0 to disable
+database_path: /path/to/your/database.kdbx
+# stdout | clipboard
+default_output: stdout
+
+# Choose ONE of the following password sources
+password_file: /path/to/your/password.txt
+# or
+password_executable: /path/to/your/password_executable.sh
+
+# seconds; 0 disables background clearing
+clipboard_timeout: 15
 ```
 
 Create an example config file:
@@ -132,6 +145,14 @@ kpasscli --create-config
 
 3. **Environment Variable**: Set `KPASSCLI_kdbpassword` with file path or executable
 
+### Environment Variables
+
+- `KPASSCLI_KDBPATH` — path to the KeePass database file
+- `KPASSCLI_kdbpassword` — path to password file or password‑producing executable
+- `KPASSCLI_OUT` — `stdout` or `clipboard`
+
+Precedence (highest first): command‑line flags → environment variables → config file.
+
 ## Examples
 
 ### Basic Usage
@@ -142,8 +163,11 @@ kpasscli -p db.kdbx -w pass.txt -i "/Personal/Email/Gmail"
 # Get username instead of password
 kpasscli -p db.kdbx -w pass.txt -i "Gmail" -f UserName
 
-# Copy password to clipboard (clears after 15 seconds if configured)
+# Copy password to clipboard using -o
 kpasscli -p db.kdbx -w pass.txt -i "Gmail" -o clipboard
+
+# Or use the shortcut flag to force clipboard output
+kpasscli -p db.kdbx -w pass.txt -i "Gmail" -C
 ```
 
 ### Using Config File
@@ -165,6 +189,15 @@ kpasscli -p db.kdbx -w pass.txt -i "MyAccount" --exact-match
 
 # Show all fields of an entry
 kpasscli -p db.kdbx -w pass.txt -i "Gmail" --show-all
+
+### TOTP
+
+```bash
+# Output only the TOTP token (entry must contain an `otp` field with an otpauth URL)
+kpasscli -p db.kdbx -w pass.txt -i "Gmail" --totp
+
+# Output password and TOTP token in one line
+kpasscli -p db.kdbx -w pass.txt -i "Gmail" --password-totp
 ```
 
 ### Using Environment Variables
@@ -186,6 +219,10 @@ clipboard_timeout: 15  # Clear clipboard after 15 seconds
 ```
 
 The clipboard clearing runs in the background, allowing the command to return to the shell prompt immediately while the cleanup happens asynchronously.
+
+Notes for Linux clipboard support:
+- kpasscli first tries Wayland’s `wl-copy`, then X11’s `xclip`, then `xsel`.
+- If none are available, it falls back to a cross‑platform clipboard library where possible.
 
 ## Security Considerations
 

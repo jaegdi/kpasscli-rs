@@ -3,3 +3,4 @@
 #
 # Binaries for programs and plugins
 /target
+/dist

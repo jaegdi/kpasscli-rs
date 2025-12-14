@@ -1,4 +1,3 @@
-use keepass::db::Group;
 use keepass::{Database, DatabaseKey};
 use std::fs::File;
 use std::path::Path;
@@ -6,8 +5,6 @@ use std::time::Instant;
 
 fn main() {
     let path = Path::new("testpass.kdbx");
-    let password = "testpasswd"; // The password content, not the file path
-
     // Read password from file
     let password = std::fs::read_to_string("testpasswd")
         .unwrap()

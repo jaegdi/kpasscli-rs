@@ -116,7 +116,7 @@ fn run() -> Result<()> {
         }
     }
 
-    let output_type = resolve_output_type(args.out, &config);
+    let output_type = resolve_output_type(args.out, args.clipboard, &config);
     let handler = Handler::new(output_type, config.clipboard_timeout);
     handler.output(&value)?;
 

@@ -23,6 +23,10 @@ pub struct Args {
     #[arg(short = 'o', long = "out")]
     pub out: Option<String>,
 
+    /// Enable exact match search
+    #[arg(short = 'C', long = "Clip")]
+    pub clipboard: bool,
+
     /// Enable case-sensitive search
     #[arg(short = 'c', long = "case-sensitive", alias = "cs")]
     pub case_sensitive: bool,
