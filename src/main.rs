@@ -63,7 +63,7 @@ fn run() -> Result<()> {
         .or(config.database_path.clone())
         .ok_or_else(|| anyhow!("no KeePass database path provided"))?;
 
-    let kdb_pass_env = std::env::var("KPASSCLI_kdbpassword").ok();
+    let kdb_pass_env = std::env::var("KPASSCLI_KDBPASSWORD").ok();
     let password = resolve_password(args.kdb_password, &config, kdb_pass_env)?;
 
     let start = std::time::Instant::now();

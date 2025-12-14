@@ -64,7 +64,7 @@ The CLI flags below reflect the current implementation in `src/args.rs`.
 | Option | Env Var | Config Key | Description |
 |--------|---------|------------|-------------|
 | `-p, --kdbpath <PATH>` | `KPASSCLI_KDBPATH` | `database_path` | Path to KeePass database file |
-| `-w, --kdbpassword <PATH>` | `KPASSCLI_kdbpassword` | `password_file` or `password_executable` | Password source: file path or executable |
+| `-w, --kdbpassword <PATH>` | `KPASSCLI_KDBPASSWORD` | `password_file` or `password_executable` | Password source: file path or executable |
 | `-i, --item <NAME>` | — | — | Entry to search for (required) |
 | `-f, --fieldname <FIELD>` | — | — | Field to retrieve (default: `Password`) |
 | `-o, --out <stdout\|clipboard>` | `KPASSCLI_OUT` | `default_output` | Output destination |
@@ -143,12 +143,12 @@ kpasscli --create-config
    password_executable: /path/to/get_password.sh
    ```
 
-3. **Environment Variable**: Set `KPASSCLI_kdbpassword` with file path or executable
+3. **Environment Variable**: Set `KPASSCLI_KDBPASSWORD` with file path or executable
 
 ### Environment Variables
 
 - `KPASSCLI_KDBPATH` — path to the KeePass database file
-- `KPASSCLI_kdbpassword` — path to password file or password‑producing executable
+- `KPASSCLI_KDBPASSWORD` — path to password file or password‑producing executable
 - `KPASSCLI_OUT` — `stdout` or `clipboard`
 
 Precedence (highest first): command‑line flags → environment variables → config file.
@@ -203,7 +203,7 @@ kpasscli -p db.kdbx -w pass.txt -i "Gmail" --password-totp
 ### Using Environment Variables
 ```bash
 export KPASSCLI_KDBPATH=/path/to/db.kdbx
-export KPASSCLI_kdbpassword=/path/to/pass.txt
+export KPASSCLI_KDBPASSWORD=/path/to/pass.txt
 export KPASSCLI_OUT=clipboard
 
 kpasscli -i "Gmail"
