@@ -6,6 +6,8 @@
 set -e
 
 # cd kpasscli-rs
+echo "Build linux local binary of kpasscli"
+cargo build --release -v
 
 echo
 echo "Build linux x86_64 binary of kpasscli"
